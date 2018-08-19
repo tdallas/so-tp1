@@ -83,7 +83,7 @@ int main(int argc, char *argv[]){
         // Read string from child, print it and close
         // reading end.
         char buf;
-            printf("lectura\n\n");
+            printf("\nlectura desde padre:\n");
             while (read(fd2[0], &buf, 1)> 0){
                 write(STDOUT_FILENO, &buf, 1); 
 
@@ -138,8 +138,6 @@ int main(int argc, char *argv[]){
                    
             }
             
-
-            printf("string read son ");
        
     	    // Close reading end
     	    close(fd1[0]);
