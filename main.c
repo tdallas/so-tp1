@@ -7,9 +7,6 @@
 #include<sys/types.h>
 #include<string.h>
 #include<sys/wait.h>
- 
-
-
 
 int main(int argc, char *argv[]){
 
@@ -18,24 +15,17 @@ int main(int argc, char *argv[]){
 		return 0;
 	} 
 
-
 	createPathQueue(argv[1]);
-	
 
 	printf("size queue %i\n", sizeQueue());
 	printf("is empty %i\n", isEmpty());
 	
-	
-	 int fd1[2];  // Used to store two ends of first pipe
+    int fd1[2];  // Used to store two ends of first pipe
     int fd2[2];  // Used to store two ends of second pipe
  
-    
     char input_str[100];
     pid_t p;
 
-    
-   
- 
     if (pipe(fd1)==-1)
     {
         fprintf(stderr, "Pipe Failed" );
@@ -64,17 +54,13 @@ int main(int argc, char *argv[]){
  
         // Write input string and close writing end of first
         // pipe.  
-       // while( !isEmpty()){
         while( sizeQueue()-1 != 0){
-        char *str1 = dequeue();
-        write(fd1[1], str1, strlen(str1)+1);
-        write(fd1[1], "///", 3);    
+            char *str1 = dequeue();
+            write(fd1[1], str1, strlen(str1)+1);
+            write(fd1[1], "///", 3);    
         }
 
         close(fd1[1]);
-
-         
-
 
         // Wait for child to send a string
         wait(NULL);
@@ -83,16 +69,12 @@ int main(int argc, char *argv[]){
         // Read string from child, print it and close
         // reading end.
         char buf;
-            printf("\nlectura desde padre:\n");
-            while (read(fd2[0], &buf, 1)> 0){
-                write(STDOUT_FILENO, &buf, 1); 
-
-            }   
+        printf("\nlectura desde padre:\n");
+        while (read(fd2[0], &buf, 1)> 0){
+            write(STDOUT_FILENO, &buf, 1); 
+        }   
         close(fd2[0]);
     }
- 
-
-
     // child process
     else
    		 {
@@ -101,29 +83,23 @@ int main(int argc, char *argv[]){
     	    // Read a string using first pipe
 
             char buf;
-            
             char str[500];
-            
         	while (read(fd1[0], &buf, 1)> 0){
-                //write(STDOUT_FILENO, &buf, 1);
-               strcat(str, &buf);
+                strcat(str, &buf);
 
-              printf("string: %s\n", str);
+                printf("string: %s\n", str);
 
-              int len = strlen(str);
-             const char *last_tree = &str[len]-3;
-
-
-
+                int len = strlen(str);
+                const char *last_tree = &str[len]-3;
                 if( strcmp(last_tree, "///") == 0  ){
-                  
+                
                     str_cut(str, strlen(str)-3, 3 );
                     printf("SLASH, string: %s  \n", str ); 
 
                     char md5[MD5_LEN + 1];
 
                     if (!CalcFileMD5(str, md5)) {
-                           puts("Error occured!");
+                        puts("Error occured!");
                     } else {
                         printf("Success! MD5 sum is: %s\n", md5);
                         write(fd2[1], str, strlen(str)+1);
@@ -135,26 +111,16 @@ int main(int argc, char *argv[]){
 
                     strcpy(str, "");
                 }
-                   
             }
             
-       
     	    // Close reading end
     	    close(fd1[0]);
-    	   
-        
     	    
-    	    // Write concatenated string and close writing end
-  
-    	    
-      	  close(fd2[1]);
- 
-    	    //exit(0);
+            // Write concatenated string and close writing end
+      	    close(fd2[1]);
     	}	
 
 }
-
-
 
 /*
  *      Remove given section from string. Negative len means remove
