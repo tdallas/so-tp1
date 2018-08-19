@@ -8,10 +8,6 @@
 #include <limits.h>
 #include <stdbool.h>
 
-
-
-
-
 // Save all the files in a queue
 void saveQueue(char* dir);
 void printQueue();
@@ -21,11 +17,6 @@ void enqueue(char * data);
 char * dequeue();
 char* peek();
 int sizeQueue();
-
-
-
-
-
 
 struct queueElement
 {
@@ -79,11 +70,10 @@ void saveQueue(char * dir)
 
 
 void createQueue()
-{//////ererere
+{
 	queueFront = NULL;
 	queueLast = NULL;
 	queueSize = 0;
-	
 }
 
 char* peek()
@@ -109,7 +99,7 @@ void enqueue(char * data)
 	if(queueFront==NULL)
 	{		
 		queueFront = (struct queueElement *)malloc(sizeof(struct queueElement));
-		queueFront->filename = malloc(strlen(data)+1);
+		queueFront->filename = malloc(strlen(data)+2);
 		strcpy(queueFront->filename,data);
 		queueFront->filename[strlen(data) + 1] = '\0';
 		queueFront->next = NULL;
@@ -118,7 +108,7 @@ void enqueue(char * data)
 	else
 	{
 		queueLast->next = (struct queueElement *)malloc(sizeof(struct queueElement));
-		queueLast->filename = malloc(strlen(data)+1);
+		queueLast->filename = malloc(strlen(data)+2);
 		strcpy(queueLast->filename,data);
 		queueLast->filename[strlen(data) + 1] = '\0';
 		queueLast->next->next = NULL;
@@ -133,8 +123,8 @@ int isEmpty()
 
 int sizeQueue()
 {
-	//return queueSize;
-	return queueSize-1;
+	return queueSize;
+	// return queueSize-1;
 }
 
 void printQueue()

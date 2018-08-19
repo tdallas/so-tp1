@@ -8,9 +8,6 @@
 #include<string.h>
 #include<sys/wait.h>
  
-
-
-
 int main(int argc, char *argv[]){
 
 	if ( argc <2){
@@ -18,20 +15,16 @@ int main(int argc, char *argv[]){
 		return 0;
 	} 
 
+    //debugging
+    printf("Creo la cola con parametros: %s \n", argv[1]);
 
 	createPathQueue(argv[1]);
-	
 
 	printf("size queue %i\n", sizeQueue());
 	printf("is empty %i\n", isEmpty());
 	
-//
-//
-//
-//	
-	 int fd1[2];  // Used to store two ends of first pipe
+    int fd1[2];  // Used to store two ends of first pipe
     int fd2[2];  // Used to store two ends of second pipe
- 
     
     char input_str[100];
     pid_t p;
@@ -92,7 +85,6 @@ int main(int argc, char *argv[]){
         	char concat_str[100];
         	read(fd1[0], concat_str, 100);
  
-       
     	    // Close both reading ends
     	    close(fd1[0]);
     	    close(fd2[0]);
@@ -102,33 +94,16 @@ int main(int argc, char *argv[]){
       
     	    char md5[MD5_LEN + 1];
     	    
-			//
-    	    //
     	if (!CalcFileMD5(concat_str, md5)) {
     	    puts("Error occured!");
     	} else {
     	    printf("Success! MD5 sum is: %s\n", md5);
     	}
-    	//
 
-    	    write(fd2[1], md5, strlen(md5)+1);
+        write(fd2[1], md5, strlen(md5)+1);
     	    
-      	  close(fd2[1]);
+        close(fd2[1]);
  
-    	    exit(0);
+        exit(0);
     	}
-//
-//
-//
-//	
-
 }
-
-
-
-
-//
-
-
-//
-
