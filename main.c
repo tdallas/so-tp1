@@ -8,6 +8,9 @@
 #include<string.h>
 #include<sys/wait.h>
  
+
+
+
 int main(int argc, char *argv[]){
 
 	if ( argc <2){
@@ -15,21 +18,22 @@ int main(int argc, char *argv[]){
 		return 0;
 	} 
 
-    //debugging
-    printf("Creo la cola con parametros: %s \n", argv[1]);
 
 	createPathQueue(argv[1]);
+	
 
 	printf("size queue %i\n", sizeQueue());
 	printf("is empty %i\n", isEmpty());
 	
-    int fd1[2];  // Used to store two ends of first pipe
+	
+	 int fd1[2];  // Used to store two ends of first pipe
     int fd2[2];  // Used to store two ends of second pipe
+ 
     
     char input_str[100];
     pid_t p;
 
-    char *str1 = dequeue();
+    
    
  
     if (pipe(fd1)==-1)
@@ -59,22 +63,36 @@ int main(int argc, char *argv[]){
         close(fd1[0]);  // Close reading end of first pipe
  
         // Write input string and close writing end of first
-        // pipe.
+        // pipe.  
+       // while( !isEmpty()){
+        while( sizeQueue()-1 != 0){
+        char *str1 = dequeue();
         write(fd1[1], str1, strlen(str1)+1);
+        write(fd1[1], "///", 3);    
+        }
+
         close(fd1[1]);
- 
+
+         
+
+
         // Wait for child to send a string
         wait(NULL);
  
         close(fd2[1]); // Close writing end of second pipe
- 
         // Read string from child, print it and close
         // reading end.
-        read(fd2[0], concat_str, 100);
-        printf("string read father: %s\n", concat_str);
+        char buf;
+            printf("lectura\n\n");
+            while (read(fd2[0], &buf, 1)> 0){
+                write(STDOUT_FILENO, &buf, 1); 
+
+            }   
         close(fd2[0]);
     }
  
+
+
     // child process
     else
    		 {
@@ -82,28 +100,75 @@ int main(int argc, char *argv[]){
  
     	    // Read a string using first pipe
 
-        	char concat_str[100];
-        	read(fd1[0], concat_str, 100);
- 
-    	    // Close both reading ends
-    	    close(fd1[0]);
-    	    close(fd2[0]);
-        
-    	    printf("string read son %s\n", concat_str);
-    	    // Write concatenated string and close writing end
-      
-    	    char md5[MD5_LEN + 1];
-    	    
-    	if (!CalcFileMD5(concat_str, md5)) {
-    	    puts("Error occured!");
-    	} else {
-    	    printf("Success! MD5 sum is: %s\n", md5);
-    	}
+            char buf;
+            
+            char str[80];
+            
+        	while (read(fd1[0], &buf, 1)> 0){
+                //write(STDOUT_FILENO, &buf, 1);
+               strcat(str, &buf);
 
-        write(fd2[1], md5, strlen(md5)+1);
+              printf("string: %s\n", str);
+
+              int len = strlen(str);
+             const char *last_tree = &str[len]-3;
+
+
+
+                if( strcmp(last_tree, "///") == 0  ){
+                  
+                    str_cut(str, strlen(str)-3, 3 );
+                    printf("SLASH, string: %s  \n", str ); 
+
+                    char md5[MD5_LEN + 1];
+
+                    if (!CalcFileMD5(str, md5)) {
+                           puts("Error occured!");
+                    } else {
+                        printf("Success! MD5 sum is: %s\n", md5);
+                        write(fd2[1], str, strlen(str)+1);
+                        write(fd2[1], " md5: ", 6);
+                        write(fd2[1], md5, strlen(md5)+1);
+                        write(fd2[1], "|", 1);
+                        close(fd2[0]);
+                    }
+
+                    strcpy(str, "");
+                }
+                   
+            }
+            
+
+            printf("string read son ");
+       
+    	    // Close reading end
+    	    close(fd1[0]);
+    	   
+        
     	    
-        close(fd2[1]);
+    	    // Write concatenated string and close writing end
+  
+    	    
+      	  close(fd2[1]);
  
-        exit(0);
-    	}
+    	    //exit(0);
+    	}	
+
+}
+
+
+
+/*
+ *      Remove given section from string. Negative len means remove
+ *      everything up to the end.
+ */
+int str_cut(char *str, int begin, int len)
+{
+    int l = strlen(str);
+
+    if (len < 0) len = l - begin;
+    if (begin + len > l) len = l - begin;
+    memmove(str + begin, str + begin + len, l - len + 1);
+
+    return len;
 }
