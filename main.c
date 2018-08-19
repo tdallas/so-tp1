@@ -102,7 +102,7 @@ int main(int argc, char *argv[]){
 
             char buf;
             
-            char str[80];
+            char str[500];
             
         	while (read(fd1[0], &buf, 1)> 0){
                 //write(STDOUT_FILENO, &buf, 1);
