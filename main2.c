@@ -21,7 +21,9 @@ int main(int argc, char **argv) {
     pid_t father = getpid();
     pid_t child;
     signal(SIGUSR2, parent_trap);
-    if (!fork()) {
+    pid_t process = fork();
+    if (!process) {
+        printf("HIJO: \n");
         child = getpid();
         printf("FORKEO SALIO PIOLA, pidHijo : %d\n",child);
         printf("FORKEO SALIO PIOLA, pidPadre : %d\n",father);
@@ -29,19 +31,21 @@ int main(int argc, char **argv) {
         signal(SIGUSR1, child_trap);
         int pauseRet = pause();
         printf("Pause retorno %d \n", pauseRet);
-    }
+        raise(SIGUSR2);
+    } else {
+        int returnStatus;
+        printf("PADRE: \n");
 
-    int returnStatus;    
+        waitpid(process, &returnStatus, 0);  // Parent process waits here for child to terminate.
 
-    waitpid(child, &returnStatus, 0);  // Parent process waits here for child to terminate.
+        if (returnStatus == 0)  // Verify child process terminated without error.  
+        {
+        printf("The child process terminated normally.\n");    
+        }
 
-    if (returnStatus == 0)  // Verify child process terminated without error.  
-    {
-       printf("The child process terminated normally.\n");    
-    }
-
-    if (returnStatus == 1)      
-    {
-       printf("The child process terminated with an error!.\n");    
+        if (returnStatus == 1)      
+        {
+        printf("The child process terminated with an error!.\n");    
+        }
     }
 }
