@@ -8,6 +8,42 @@
 #include<string.h>
 #include<sys/wait.h>
 
+struct msg {
+    int bytesToRead;
+    char * data;
+} msg;
+
+char * parseInt(int num) {
+    int numArray[4];
+    char *toRet = malloc(sizeof(char) *5);
+
+    int current = 3;
+    while (current != 0){
+        if (num != 0) {
+            numArray[current] = num % 10;
+            num /=10;
+        } else {
+            numArray[current] = 0;
+        }
+        current-= 1;
+    }
+
+    for (int i = 0 ; i < 4 ; i++)
+        toRet[i] = (numArray[i] + '0');
+    toRet[4] = '\0';
+    return toRet;
+}
+
+int parseChar(char * str) {
+    int num = 0;
+    int exp = 1000;
+    for (int i = 0 ; i < 4 ; i++) {
+        num += (str[i] - '0') * exp;
+        exp /= 10;
+    }
+    return num;
+}
+
 int main(int argc, char *argv[]){
 
 	if ( argc <2){
@@ -23,7 +59,6 @@ int main(int argc, char *argv[]){
     int fd1[2];  // Used to store two ends of first pipe
     int fd2[2];  // Used to store two ends of second pipe
  
-    char input_str[100];
     pid_t p;
 
     if (pipe(fd1)==-1)
@@ -48,16 +83,23 @@ int main(int argc, char *argv[]){
     // Parent process
     else if (p > 0)
     {
-        char concat_str[100];
- 
         close(fd1[0]);  // Close reading end of first pipe
  
         // Write input string and close writing end of first
         // pipe.  
         while( sizeQueue()-1 != 0){
             char *str1 = dequeue();
-            write(fd1[1], str1, strlen(str1)+1);
-            write(fd1[1], "///", 3);    
+            // printf("String: %s, strlen: %d \n", str1, strlen(str1));
+            char *strlength = parseInt(strlen(str1));
+
+            struct msg *msgToSend = malloc(sizeof(msg));
+            msgToSend->bytesToRead = strlen(str1);
+            msgToSend->data = str1;
+            // printf("A punto de hacer un write \n");
+
+            write(fd1[1], msgToSend, sizeof(msg));
+            
+            free(msgToSend);
         }
 
         close(fd1[1]);
@@ -82,35 +124,32 @@ int main(int argc, char *argv[]){
  
     	    // Read a string using first pipe
 
-            char buf;
-            char str[500];
-        	while (read(fd1[0], &buf, 1)> 0){
-                strcat(str, &buf);
+            // char str[500];
+            // char bytesToRead[4];
+            char md5[MD5_LEN + 1];
+            struct msg * msgToRead = malloc(sizeof(msg));
+            printf("Size of struct : %d \n", sizeof(msg));
+        	while (read(fd1[0], msgToRead,sizeof(msg))> 0){
+                printf("string: %s\n", msgToRead->data);
 
-                printf("string: %s\n", str);
+                int len = parseChar(msgToRead->bytesToRead);
+                printf("About to read %d bytes \n", len);
+                read(fd1[0], msgToRead, len);
 
-                int len = strlen(str);
-                const char *last_tree = &str[len]-3;
-                if( strcmp(last_tree, "///") == 0  ){
-                
-                    str_cut(str, strlen(str)-3, 3 );
-                    printf("SLASH, string: %s  \n", str ); 
-
-                    char md5[MD5_LEN + 1];
-
-                    if (!CalcFileMD5(str, md5)) {
-                        puts("Error occured!");
-                    } else {
-                        printf("Success! MD5 sum is: %s\n", md5);
-                        write(fd2[1], str, strlen(str)+1);
-                        write(fd2[1], " md5: ", 6);
-                        write(fd2[1], md5, strlen(md5)+1);
-                        write(fd2[1], "|", 1);
-                        close(fd2[0]);
-                    }
-
-                    strcpy(str, "");
+                if (!CalcFileMD5(msgToRead->data, md5)) {
+                    puts("Error occured!");
+                } else {
+                    printf("Success! MD5 sum is: %s\n", md5);
+                    write(fd2[1], msgToRead->data, msgToRead->bytesToRead)+1;
+                    write(fd2[1], " md5: ", 6);
+                    write(fd2[1], md5, strlen(md5)+1);
+                    write(fd2[1], "|", 1);
+                    close(fd2[0]);
                 }
+
+                free(msgToRead);
+                msgToRead = malloc(sizeof(msg));
+                // strcpy(str, "");
             }
             
     	    // Close reading end
@@ -119,7 +158,6 @@ int main(int argc, char *argv[]){
             // Write concatenated string and close writing end
       	    close(fd2[1]);
     	}	
-
 }
 
 /*
