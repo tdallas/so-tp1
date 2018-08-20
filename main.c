@@ -59,48 +59,36 @@ int main(int argc, char *argv[]){
 	
     int fd1[2];  // Used to store two ends of first pipe
     int fd2[2];  // Used to store two ends of second pipe
- 
     pid_t p;
 
-    if (pipe(fd1)==-1)
-    {
+    if (pipe(fd1)==-1) {
         fprintf(stderr, "Pipe Failed" );
         return 1;
     }
-    if (pipe(fd2)==-1)
-    {
+
+    if (pipe(fd2)==-1) {
         fprintf(stderr, "Pipe Failed" );
         return 1;
     }
  
     p = fork();
  
-    if (p < 0)
-    {
+    if (p < 0) {
         fprintf(stderr, "fork Failed" );
         return 1;
-    }
- 
-    // Parent process
-    else if (p > 0)
-    {
+    } else if (p > 0) {  // Parent process
         close(fd1[0]);  // Close reading end of first pipe
  
         // Write input string and close writing end of first
         // pipe.  
         while( sizeQueue()-1 != 0){
             char *str1 = dequeue();
-            // printf("String: %s, strlen: %d \n", str1, strlen(str1));
             char *strlength = parseInt(strlen(str1));
                 
             struct msg *msgToSend = malloc(sizeof(msg));
             msgToSend->bytesToRead = strlen(str1);
             msgToSend->data = str1;
-            // printf("A punto de hacer un write \n");
-            // printf("Voy a escribir un string de %d bytes, string : %s\n", msgToSend->bytesToRead, msgToSend->data);
 
-            // write(fd1[1], msgToSend.bytesToRead, sizeof(int));
-            // write(fd1[1], msgToSend->data, msgToRead->bytes);
             write(fd1[1], msgToSend, sizeof(msg));
             
             free(msgToSend->data);
@@ -121,14 +109,10 @@ int main(int argc, char *argv[]){
             write(STDOUT_FILENO, &buf, 1); 
         }   
         close(fd2[0]);
-    }
-    // child process
-    else
-   		 {
+    } else { // child process
     	    close(fd1[1]);  // Close writing end of first pipe
- 
-    	    // Read a string using first pipe
 
+    	    // Read a string using first pipe
             char md5[MD5_LEN + 1];
             struct msg * msgToRead = malloc(sizeof(msg));
         	while (read(fd1[0], msgToRead,sizeof(msg))> 0){
@@ -156,19 +140,4 @@ int main(int argc, char *argv[]){
             // Write concatenated string and close writing end
       	    close(fd2[1]);
     	}	
-}
-
-/*
- *      Remove given section from string. Negative len means remove
- *      everything up to the end.
- */
-int str_cut(char *str, int begin, int len)
-{
-    int l = strlen(str);
-
-    if (len < 0) len = l - begin;
-    if (begin + len > l) len = l - begin;
-    memmove(str + begin, str + begin + len, l - len + 1);
-
-    return len;
 }
