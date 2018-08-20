@@ -37,6 +37,7 @@ char * parseInt(int num) {
 int parseChar(char * str) {
     int num = 0;
     int exp = 1000;
+    printf("supuesto bytes to read %s \n",str);
     for (int i = 0 ; i < 4 ; i++) {
         num += (str[i] - '0') * exp;
         exp /= 10;
@@ -91,14 +92,18 @@ int main(int argc, char *argv[]){
             char *str1 = dequeue();
             // printf("String: %s, strlen: %d \n", str1, strlen(str1));
             char *strlength = parseInt(strlen(str1));
-
+                
             struct msg *msgToSend = malloc(sizeof(msg));
             msgToSend->bytesToRead = strlen(str1);
             msgToSend->data = str1;
             // printf("A punto de hacer un write \n");
+            // printf("Voy a escribir un string de %d bytes, string : %s\n", msgToSend->bytesToRead, msgToSend->data);
 
+            // write(fd1[1], msgToSend.bytesToRead, sizeof(int));
+            // write(fd1[1], msgToSend->data, msgToRead->bytes);
             write(fd1[1], msgToSend, sizeof(msg));
             
+            free(msgToSend->data);
             free(msgToSend);
         }
 
@@ -111,7 +116,7 @@ int main(int argc, char *argv[]){
         // Read string from child, print it and close
         // reading end.
         char buf;
-        printf("\nlectura desde padre:\n");
+        printf("\nLectura desde padre:\n");
         while (read(fd2[0], &buf, 1)> 0){
             write(STDOUT_FILENO, &buf, 1); 
         }   
@@ -124,32 +129,25 @@ int main(int argc, char *argv[]){
  
     	    // Read a string using first pipe
 
-            // char str[500];
-            // char bytesToRead[4];
             char md5[MD5_LEN + 1];
             struct msg * msgToRead = malloc(sizeof(msg));
-            printf("Size of struct : %d \n", sizeof(msg));
         	while (read(fd1[0], msgToRead,sizeof(msg))> 0){
-                printf("string: %s\n", msgToRead->data);
 
-                int len = parseChar(msgToRead->bytesToRead);
-                printf("About to read %d bytes \n", len);
-                read(fd1[0], msgToRead, len);
+                int len = msgToRead->bytesToRead;
 
                 if (!CalcFileMD5(msgToRead->data, md5)) {
                     puts("Error occured!");
                 } else {
                     printf("Success! MD5 sum is: %s\n", md5);
-                    write(fd2[1], msgToRead->data, msgToRead->bytesToRead)+1;
-                    write(fd2[1], " md5: ", 6);
-                    write(fd2[1], md5, strlen(md5)+1);
-                    write(fd2[1], "|", 1);
+                    write(fd2[1], msgToRead->data, msgToRead->bytesToRead+1);
+                    write(fd2[1], " md5: ", 7);
+                    write(fd2[1], md5, strlen(md5));
+                    write(fd2[1], "\n", 1);
                     close(fd2[0]);
                 }
-
+                free(msgToRead->data);
                 free(msgToRead);
                 msgToRead = malloc(sizeof(msg));
-                // strcpy(str, "");
             }
             
     	    // Close reading end
