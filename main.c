@@ -140,12 +140,13 @@ int main(int argc, char *argv[]){
                 
                 // Write concatenated string and close writing end
                 close(pipes[i].pipeChildO[1]);
+                exit(0);
             }	
     }
-
     int storage;
     for(int i = 0; i < 2; i++)
     {
-        waitpid(p[i], &storage, WUNTRACED);
+        if (p[i] != 0)
+            waitpid(p[i], &storage, WUNTRACED);
     }
  }
