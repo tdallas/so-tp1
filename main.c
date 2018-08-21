@@ -72,7 +72,7 @@ int main(int argc, char *argv[]){
     pid_t p[2];
     int originalSizeQueue = sizeQueue();
     for (int i = 0 ; i < 2 ; i++) {
-        printf("PROCESO %d\n", i);
+
         p[i] = fork();
         if (p[i] < 0) {
             fprintf(stderr, "fork Failed" );
@@ -82,11 +82,9 @@ int main(int argc, char *argv[]){
 
             // Write input string and close writing end of first
             // pipe.  
-            printf("ANTES DEL WHILE sizequeue vale %d\n", sizeQueue());
             while( sizeQueue()-1 != 0){
                 if (i == 0 && sizeQueue() == originalSizeQueue/2)
                     break;
-                printf("ENTRO AL WHILE\n");
                 char *str1 = dequeue();
                 char *strlength = parseInt(strlen(str1));
                     
@@ -101,9 +99,6 @@ int main(int argc, char *argv[]){
             }
 
             close(pipes[i].pipeChildI[1]);
-
-            // Wait for child to send a string
-            wait(NULL);
     
             close(pipes[i].pipeChildO[1]); // Close writing end of second pipe
             // Read string from child, print it and close
@@ -115,6 +110,7 @@ int main(int argc, char *argv[]){
             }   
             close(pipes[i].pipeChildO[0]);
         } else { // child process
+                printf("Proceso hijo\n");
                 close(pipes[i].pipeChildI[1]);  // Close writing end of first pipe
 
                 // Read a string using first pipe
@@ -127,7 +123,7 @@ int main(int argc, char *argv[]){
                     if (!CalcFileMD5(msgToRead->data, md5)) {
                         puts("Error occured!");
                     } else {
-                        printf("Success! MD5 sum is: %s\n", md5);
+                        // printf("Success! MD5 sum is: %s\n", md5);
                         write(pipes[i].pipeChildO[1], msgToRead->data, msgToRead->bytesToRead+1);
                         write(pipes[i].pipeChildO[1], " md5: ", 7);
                         write(pipes[i].pipeChildO[1], md5, strlen(md5));
@@ -145,6 +141,11 @@ int main(int argc, char *argv[]){
                 // Write concatenated string and close writing end
                 close(pipes[i].pipeChildO[1]);
             }	
-        printf("TERMINO PROCESO %d\n\n", i);
+    }
+
+    int storage;
+    for(int i = 0; i < 2; i++)
+    {
+        waitpid(p[i], &storage, WUNTRACED);
     }
  }
