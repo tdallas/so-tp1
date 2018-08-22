@@ -18,6 +18,12 @@ char * dequeue();
 char* peek();
 int sizeQueue();
 
+int paths = 0;
+
+int pathsSize(){
+	return paths;
+}
+
 struct queueElement
 {
 	char * filename;
@@ -55,6 +61,11 @@ void saveQueue(char * dir)
             strcpy(node,dir);
             strcat(node,bar);
             strcat(node,dirEntry->d_name);
+
+            //
+            paths += strlen(node);
+
+
             enqueue(node);
             free(node);
         }
