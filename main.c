@@ -7,11 +7,15 @@
 #include<sys/types.h>
 #include<string.h>
 #include<sys/wait.h>
+#include <errno.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 
 #define MAX_SLAVES 5
 #define BLOCK 10
 
-//NO LO ESTOY USANDO
+//No lo estoy usando
 struct msg {
   int bytesToRead;
   char * data;
@@ -114,15 +118,64 @@ char * readPipe(int pipe[2]){
 
 int main(int argc, char *argv[]){
 
-  if ( argc <2){
-    printf("Usage: %s <directory>\n", argv[0]);
-    return 0;
-  }
+
+char *finalMsg = "";
+
+
+
+    //semaphore
+    char semViewName[64];
+    sem_t *semView;
+    sprintf(semViewName, "/semView%d", getpid());
+    semView = sem_open(semViewName, O_CREAT | O_EXCL, 0777, 0);
+
+    if(semView == SEM_FAILED){
+        perror("ERROR OPEN SEMAPHORE");
+        return 1;
+    }
+
 
   createPathQueue(argv[1]);
 
-  printf("size queue %i\n", sizeQueue());
-  printf("is empty %i\n", isEmpty());
+    int finalMsgSize = pathsSize() + ((sizeQueue()-1) * 41);
+
+
+    //
+    //
+
+
+
+    //lpthread lrt
+    //shm for size
+    const int sharedMemorySize = sizeof(int*);
+    const char* name = "MySharedMemory";
+    int shm_fd; //shm file descriptor
+    int *ptr;
+    shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
+    ftruncate(shm_fd, sharedMemorySize);
+    ptr = (int*)mmap(NULL, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+
+
+    memcpy(ptr, &finalMsgSize, sizeof(int));
+
+
+    //shm for the message
+    const int sharedMemorySize2 = finalMsgSize;
+    const char* name2 = "MySharedMemory2";
+    int shm_fd2;
+    char *ptr2;
+    shm_fd2 = shm_open(name2, O_CREAT | O_RDWR, 0666);
+    ftruncate(shm_fd2, sharedMemorySize2);
+
+    ptr2 = (char*)mmap(NULL, sharedMemorySize2, PROT_WRITE, MAP_SHARED, shm_fd2, 0);
+   // memcpy(ptr2, finalMsg, finalMsgSize);
+
+
+
+    //
+
+	printf("size queue %i\n", sizeQueue());
+	printf("is empty %i\n", isEmpty());
 
   //Creates pipes to communicate with children (pipeChildI receives messages from child and pipeChildO sends messages to child)
   for (int i = 0 ; i < MAX_SLAVES ; i++) {
@@ -177,24 +230,34 @@ int main(int argc, char *argv[]){
       }
     }
   }
+    //Tell childs to exit and closes pipes
+    char str1[1];
+    str1[0] = 0;
+    for(int i=0; i<MAX_SLAVES;i++){
+      write(pipes[i].pipeChildO[1], str1, 1);
 
-  //Tell childs to exit and closes pipes
-  char str1[1];
-  str1[0] = 0;
-  for(int i=0; i<MAX_SLAVES;i++){
-    write(pipes[i].pipeChildO[1], str1, 1);
-
-    close(pipes[i].pipeChildI[0]);
-    close(pipes[i].pipeChildO[1]);
-  }
-
+      close(pipes[i].pipeChildI[0]);
+      close(pipes[i].pipeChildO[1]);
+    }
 
 
-  //NO SE QUE HACE
-  int storage;
-  for(int i = 0; i < 2; i++)
-  {
-    if (p[i] != 0)
-    waitpid(p[i], &storage, WUNTRACED);
-  }
-}
+
+
+    sem_post(semView);
+
+
+
+
+    printf("so far so good, my pid is: %i\n", getpid());
+    sleep(20);
+    printf("bye!\n");
+
+
+    shm_unlink("MySharedMemory");
+    shm_unlink("MySharedMemory2");
+    sem_close(semView);
+    sem_unlink(semViewName);
+
+
+
+ }
