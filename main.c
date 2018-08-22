@@ -12,14 +12,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#define MAX_SLAVES 5
+#define MAX_SLAVES 6
 #define BLOCK 10
-
-//No lo estoy usando
-struct msg {
-  int bytesToRead;
-  char * data;
-};
 
 typedef struct pipes {
   int pipeChildI[2];
@@ -75,11 +69,11 @@ void receiveTask(char *msgToRead, int i){
   char md5[MD5_LEN + 1];
 
   if (!CalcFileMD5(msgToRead, md5)) {
-    puts("Error occured!");
+    printf("Error occured with: %s\n", msgToRead);
   } else {
 
-    char * fullMsg = malloc(strlen(msgToRead)+6+strlen(md5));
-    sprintf(fullMsg, "%s md5:%s", msgToRead, md5);
+    char * fullMsg = malloc(strlen(msgToRead)+8+strlen(md5));
+    sprintf(fullMsg, "%s md5: %s\n", msgToRead, md5);
 
     write(pipes[i].pipeChildI[1], fullMsg,strlen(fullMsg)+1);
 
@@ -108,74 +102,72 @@ char * readPipe(int pipe[2]){
         msg = realloc(msg, size + BLOCK);
         size += BLOCK;
       }
-       msg[index++] = buf;
-     }
-   }
-   msg = realloc(msg, index+2);
-   msg[index] = 0;
-   return msg;
+      msg[index++] = buf;
+    }
+  }
+  msg = realloc(msg, index+2);
+  msg[index] = 0;
+  return msg;
 }
+
 
 int main(int argc, char *argv[]){
 
 
-char *finalMsg = "";
+  char *finalMsg = "";
 
 
 
-    //semaphore
-    char semViewName[64];
-    sem_t *semView;
-    sprintf(semViewName, "/semView%d", getpid());
-    semView = sem_open(semViewName, O_CREAT | O_EXCL, 0777, 0);
+  //semaphore
+  char semViewName[64];
+  sem_t *semView;
+  sprintf(semViewName, "/semView%d", getpid());
+  semView = sem_open(semViewName, O_CREAT | O_EXCL, 0777, 0);
 
-    if(semView == SEM_FAILED){
-        perror("ERROR OPEN SEMAPHORE");
-        return 1;
-    }
+  if(semView == SEM_FAILED){
+    perror("ERROR OPEN SEMAPHORE");
+    return 1;
+  }
 
 
   createPathQueue(argv[1]);
 
-    int finalMsgSize = pathsSize() + ((sizeQueue()-1) * 41);
+  int finalMsgSize = pathsSize() + ((sizeQueue()-1) * 41);
 
 
-    //
-    //
-
-
-
-    //lpthread lrt
-    //shm for size
-    const int sharedMemorySize = sizeof(int*);
-    const char* name = "MySharedMemory";
-    int shm_fd; //shm file descriptor
-    int *ptr;
-    shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
-    ftruncate(shm_fd, sharedMemorySize);
-    ptr = (int*)mmap(NULL, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
-
-
-    memcpy(ptr, &finalMsgSize, sizeof(int));
-
-
-    //shm for the message
-    const int sharedMemorySize2 = finalMsgSize;
-    const char* name2 = "MySharedMemory2";
-    int shm_fd2;
-    char *ptr2;
-    shm_fd2 = shm_open(name2, O_CREAT | O_RDWR, 0666);
-    ftruncate(shm_fd2, sharedMemorySize2);
-
-    ptr2 = (char*)mmap(NULL, sharedMemorySize2, PROT_WRITE, MAP_SHARED, shm_fd2, 0);
-   // memcpy(ptr2, finalMsg, finalMsgSize);
+  //
+  //
 
 
 
-    //
+  //lpthread lrt
+  //shm for size
+  const int sharedMemorySize = sizeof(int*);
+  const char* name = "MySharedMemory";
+  int shm_fd; //shm file descriptor
+  int *ptr;
+  shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
+  ftruncate(shm_fd, sharedMemorySize);
+  ptr = (int*)mmap(NULL, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
-	printf("size queue %i\n", sizeQueue());
-	printf("is empty %i\n", isEmpty());
+
+  memcpy(ptr, &finalMsgSize, sizeof(int));
+
+
+  //shm for the message
+  const int sharedMemorySize2 = finalMsgSize;
+  const char* name2 = "MySharedMemory2";
+  int shm_fd2;
+  char *ptr2;
+  shm_fd2 = shm_open(name2, O_CREAT | O_RDWR, 0666);
+  ftruncate(shm_fd2, sharedMemorySize2);
+
+  ptr2 = (char*)mmap(NULL, sharedMemorySize2, PROT_WRITE, MAP_SHARED, shm_fd2, 0);
+  // memcpy(ptr2, finalMsg, finalMsgSize);
+
+
+  printf("size queue %i\n", sizeQueue());
+  printf("is empty %i\n", isEmpty());
 
   //Creates pipes to communicate with children (pipeChildI receives messages from child and pipeChildO sends messages to child)
   for (int i = 0 ; i < MAX_SLAVES ; i++) {
@@ -189,13 +181,12 @@ char *finalMsg = "";
 
     p[i] = fork();
     if (p[i] < 0) {
-      fprintf(stderr, "fork Failed" );
+      fprintf(stderr, "Fork Failed" );
       return 1;
     } else if (p[i] == 0) {  // Child Process
 
       close(pipes[i].pipeChildI[0]);
       close(pipes[i].pipeChildO[1]);
-
 
       while(1){
 
@@ -212,6 +203,7 @@ char *finalMsg = "";
           free(msg);
         }
       }
+
     }else{ // Parent Process
       close(pipes[i].pipeChildI[1]);
       close(pipes[i].pipeChildO[0]);
@@ -224,40 +216,43 @@ char *finalMsg = "";
     for(int i=0; i < MAX_SLAVES && sizeQueue()-1 != 0 ; i++){
       char * msg = readPipe(pipes[i].pipeChildI);
       if(msg != NULL){
-        printf("(%d) %s\n",i, msg);
+        //printf("(%d) %s\n",i, msg);
+        sprintf(ptr2, msg, strlen(msg)+1);
+        ptr2+=strlen(msg)+1;
         delegateTask(i);
         free(msg);
       }
     }
   }
-    //Tell childs to exit and closes pipes
-    char str1[1];
-    str1[0] = 0;
-    for(int i=0; i<MAX_SLAVES;i++){
-      write(pipes[i].pipeChildO[1], str1, 1);
 
-      close(pipes[i].pipeChildI[0]);
-      close(pipes[i].pipeChildO[1]);
-    }
+  //Tells childs to exit and closes pipes
+  char str1[1];
+  str1[0] = 0;
+  for(int i=0; i<MAX_SLAVES;i++){
+    write(pipes[i].pipeChildO[1], str1, 1);
 
-
-
-
-    sem_post(semView);
+    close(pipes[i].pipeChildI[0]);
+    close(pipes[i].pipeChildO[1]);
+  }
 
 
 
 
-    printf("so far so good, my pid is: %i\n", getpid());
-    sleep(20);
-    printf("bye!\n");
-
-
-    shm_unlink("MySharedMemory");
-    shm_unlink("MySharedMemory2");
-    sem_close(semView);
-    sem_unlink(semViewName);
+  sem_post(semView);
 
 
 
- }
+
+  printf("so far so good, my pid is: %i\n", getpid());
+  sleep(20);
+  printf("bye!\n");
+
+
+  shm_unlink("MySharedMemory");
+  shm_unlink("MySharedMemory2");
+  sem_close(semView);
+  sem_unlink(semViewName);
+
+
+
+}
