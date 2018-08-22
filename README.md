@@ -6,7 +6,7 @@
 3) Go to the directory you want to link with docker's image and run docker:
 > sudo docker run -v ${PWD}:/root -ti agodio/itba-so:1.0
 4) Go to the project's root directory and compile:
-> gcc -o tp main.c queue.c md5.c
+> gcc -o tp main.c queue.c md5.c -lpthread -lrt
 5) Have fun finding bugs:
 > ./tp
 
