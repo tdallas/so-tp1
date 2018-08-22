@@ -25,7 +25,7 @@ void view(char *PID){
 
 	//semaphore
 	char semViewName[64];
-	sem_t *semView, *semEnd;
+	sem_t *semView;
 	sprintf(semViewName, "semView%s", PID);
 	semView = sem_open(semViewName, 0);
 
