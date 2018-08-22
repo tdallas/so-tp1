@@ -12,8 +12,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#define MAX_SLAVES 6
-#define BLOCK 10
+#define MAX_SLAVES 4
+#define BLOCK 6
 
 typedef struct pipes {
   int pipeChildI[2];
@@ -59,26 +59,27 @@ void delegateTask(int i){
   char *str1 = dequeue();
 
   write(pipes[i].pipeChildO[1], str1, strlen(str1)+1);
-
 }
 
 //Receive a task and pipes the md5 result to parent (Child)
 void receiveTask(char *msgToRead, int i){
 
-
   char md5[MD5_LEN + 1];
 
-  if (!CalcFileMD5(msgToRead, md5)) {
-    printf("Error occured with: %s\n", msgToRead);
-  } else {
 
-    char * fullMsg = malloc(strlen(msgToRead)+8+strlen(md5));
+  char * fullMsg;
+  if(!CalcFileMD5(msgToRead, md5)){
+    fullMsg = malloc(strlen("Error occurred!\n")+1);
+    sprintf(fullMsg, "Error occurred!\n");
+  }else{
+    fullMsg = malloc(strlen(msgToRead)+strlen(" md5 \n")+1+strlen(md5));
     sprintf(fullMsg, "%s md5: %s\n", msgToRead, md5);
-
-    write(pipes[i].pipeChildI[1], fullMsg,strlen(fullMsg)+1);
-
-    free(fullMsg);
   }
+
+
+  write(pipes[i].pipeChildI[1], fullMsg,strlen(fullMsg)+1);
+  free(fullMsg);
+
 
 }
 
@@ -95,7 +96,6 @@ char * readPipe(int pipe[2]){
   }
 
   msg[index++]=buf;
-
   while(buf != 0){
     if(read(pipe[0], &buf, 1) > 0){
       if(index +1 == size){
@@ -112,6 +112,7 @@ char * readPipe(int pipe[2]){
 
 
 int main(int argc, char *argv[]){
+
 
 
   char *finalMsg = "";
@@ -177,6 +178,8 @@ int main(int argc, char *argv[]){
 
   pid_t p[MAX_SLAVES];
 
+
+  //int initial = sizeQueue()-1;
   for (int i = 0 ; i < MAX_SLAVES && sizeQueue()-1!=0 ; i++) {
 
     p[i] = fork();
@@ -189,7 +192,6 @@ int main(int argc, char *argv[]){
       close(pipes[i].pipeChildO[1]);
 
       while(1){
-
         char * msg = readPipe(pipes[i].pipeChildO);
         if(msg != NULL){
           if(*msg == 0){
@@ -207,27 +209,53 @@ int main(int argc, char *argv[]){
     }else{ // Parent Process
       close(pipes[i].pipeChildI[1]);
       close(pipes[i].pipeChildO[0]);
-
-      delegateTask(i);
     }
   }
 
-  while(sizeQueue()-1 != 0){
-    for(int i=0; i < MAX_SLAVES && sizeQueue()-1 != 0 ; i++){
+  printf("so far so good, my pid is: %i\n", getpid());
+
+  //Distribute inital tasks
+  int sent =0, received = 0;
+  int k=0, initialDistribution = (int)((sizeQueue()-1)/2);
+
+  if(initialDistribution<MAX_SLAVES){
+    for(int i=0; i< MAX_SLAVES && sizeQueue()-1>0; i++){
+      delegateTask(i);
+      sent++;
+    }
+  }else{
+    while(initialDistribution > 0){
+      delegateTask(k);
+      k = (k+1)%(MAX_SLAVES);
+      sent++;
+      initialDistribution--;
+    }
+  }
+
+  char str1[1];
+  str1[0] = 0;
+  while(sent != received){
+    for(int i=0; i < MAX_SLAVES && sent != received ; i++){
       char * msg = readPipe(pipes[i].pipeChildI);
       if(msg != NULL){
-        //printf("(%d) %s\n",i, msg);
         sprintf(ptr2, msg, strlen(msg)+1);
         ptr2+=strlen(msg)+1;
-        delegateTask(i);
+        received++;
+        if(sizeQueue()-1!=0){
+          sent++;
+          delegateTask(i);
+        }else{
+          //Tell child that there are no more tasks
+          write(pipes[i].pipeChildO[1], str1, 1);
+        }
         free(msg);
       }
+      printf("%d :: %d :: %d\n", received, sizeQueue()-1, sent);
     }
   }
 
   //Tells childs to exit and closes pipes
-  char str1[1];
-  str1[0] = 0;
+
   for(int i=0; i<MAX_SLAVES;i++){
     write(pipes[i].pipeChildO[1], str1, 1);
 
@@ -243,7 +271,7 @@ int main(int argc, char *argv[]){
 
 
 
-  printf("so far so good, my pid is: %i\n", getpid());
+
   sleep(20);
   printf("bye!\n");
 
