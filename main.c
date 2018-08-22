@@ -7,227 +7,252 @@
 #include<sys/types.h>
 #include<string.h>
 #include<sys/wait.h>
-
-
 #include <errno.h>
 #include <semaphore.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 
-struct msg {
-    int bytesToRead;
-    char * data;
-} msg;
+#define MAX_SLAVES 6
+#define BLOCK 10
 
 typedef struct pipes {
-    int pipeChildI[2];
-    int pipeChildO[2];
+  int pipeChildI[2];
+  int pipeChildO[2];
 } pipeType;
 
+pipeType pipes[MAX_SLAVES];
+
 char * parseInt(int num) {
-    int numArray[4];
-    char *toRet = malloc(sizeof(char) *5);
+  int numArray[4];
+  char *toRet = malloc(sizeof(char) *5);
 
-    int current = 3;
-    while (current != 0){
-        if (num != 0) {
-            numArray[current] = num % 10;
-            num /=10;
-        } else {
-            numArray[current] = 0;
-        }
-        current-= 1;
+  int current = 3;
+  while (current != 0){
+    if (num != 0) {
+      numArray[current] = num % 10;
+      num /=10;
+    } else {
+      numArray[current] = 0;
     }
+    current-= 1;
+  }
 
-    for (int i = 0 ; i < 4 ; i++)
-        toRet[i] = (numArray[i] + '0');
-    toRet[4] = '\0';
-    return toRet;
+  for (int i = 0 ; i < 4 ; i++)
+  toRet[i] = (numArray[i] + '0');
+  toRet[4] = '\0';
+  return toRet;
 }
 
 int parseChar(char * str) {
-    int num = 0;
-    int exp = 1000;
-    printf("supuesto bytes to read %s \n",str);
-    for (int i = 0 ; i < 4 ; i++) {
-        num += (str[i] - '0') * exp;
-        exp /= 10;
-    }
-    return num;
+  int num = 0;
+  int exp = 1000;
+  printf("supuesto bytes to read %s \n",str);
+  for (int i = 0 ; i < 4 ; i++) {
+    num += (str[i] - '0') * exp;
+    exp /= 10;
+  }
+  return num;
 }
+
+//Delegates a task to the child specified by parameter
+void delegateTask(int i){
+  char *str1 = dequeue();
+
+  write(pipes[i].pipeChildO[1], str1, strlen(str1)+1);
+
+}
+
+//Receive a task and pipes the md5 result to parent (Child)
+void receiveTask(char *msgToRead, int i){
+
+
+  char md5[MD5_LEN + 1];
+
+  if (!CalcFileMD5(msgToRead, md5)) {
+    printf("Error occured with: %s\n", msgToRead);
+  } else {
+
+    char * fullMsg = malloc(strlen(msgToRead)+8+strlen(md5));
+    sprintf(fullMsg, "%s md5: %s\n", msgToRead, md5);
+
+    write(pipes[i].pipeChildI[1], fullMsg,strlen(fullMsg)+1);
+
+    free(fullMsg);
+  }
+
+}
+
+//Reads from pipe if contains unread characters until finds a 0
+char * readPipe(int pipe[2]){
+  int index = 0;
+  int size = BLOCK;
+  char * msg = malloc(BLOCK);
+  char buf;
+
+  if(!(read(pipe[0], &buf, 1) > 0)){
+    free(msg);
+    return NULL;
+  }
+
+  msg[index++]=buf;
+
+  while(buf != 0){
+    if(read(pipe[0], &buf, 1) > 0){
+      if(index +1 == size){
+        msg = realloc(msg, size + BLOCK);
+        size += BLOCK;
+      }
+      msg[index++] = buf;
+    }
+  }
+  msg = realloc(msg, index+2);
+  msg[index] = 0;
+  return msg;
+}
+
 
 int main(int argc, char *argv[]){
 
 
-char *finalMsg = "";
+  char *finalMsg = "";
 
 
 
-    //semaphore
-    char semViewName[64];
-    sem_t *semView;
-    sprintf(semViewName, "/semView%d", getpid());
-    semView = sem_open(semViewName, O_CREAT | O_EXCL, 0777, 0);
+  //semaphore
+  char semViewName[64];
+  sem_t *semView;
+  sprintf(semViewName, "/semView%d", getpid());
+  semView = sem_open(semViewName, O_CREAT | O_EXCL, 0777, 0);
 
-    if(semView == SEM_FAILED){
-        perror("ERROR OPEN SEMAPHORE");
-        return 1;
-    } 
-    
-
-	createPathQueue(argv[1]);
-
-    int finalMsgSize = pathsSize() + ((sizeQueue()-1) * 41);
+  if(semView == SEM_FAILED){
+    perror("ERROR OPEN SEMAPHORE");
+    return 1;
+  }
 
 
-    //
-    //
+  createPathQueue(argv[1]);
 
-    
-
-    //lpthread lrt
-    //shm for size
-    const int sharedMemorySize = sizeof(int*); 
-    const char* name = "MySharedMemory";  
-    int shm_fd; //shm file descriptor
-    int *ptr;
-    shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
-    ftruncate(shm_fd, sharedMemorySize);
-    ptr = (int*)mmap(NULL, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
-
-   
-    memcpy(ptr, &finalMsgSize, sizeof(int));
+  int finalMsgSize = pathsSize() + ((sizeQueue()-1) * 41);
 
 
-    //shm for the message
-    const int sharedMemorySize2 = finalMsgSize; 
-    const char* name2 = "MySharedMemory2";
-    int shm_fd2;
-    char *ptr2;
-    shm_fd2 = shm_open(name2, O_CREAT | O_RDWR, 0666);
-    ftruncate(shm_fd2, sharedMemorySize2);
-    
-    ptr2 = (char*)mmap(NULL, sharedMemorySize2, PROT_WRITE, MAP_SHARED, shm_fd2, 0);
-   // memcpy(ptr2, finalMsg, finalMsgSize);
+  //
+  //
 
 
 
-    //
+  //lpthread lrt
+  //shm for size
+  const int sharedMemorySize = sizeof(int*);
+  const char* name = "MySharedMemory";
+  int shm_fd; //shm file descriptor
+  int *ptr;
+  shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
+  ftruncate(shm_fd, sharedMemorySize);
+  ptr = (int*)mmap(NULL, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
-	printf("size queue %i\n", sizeQueue());
-	printf("is empty %i\n", isEmpty());
 
-    pipeType pipes[2];
+  memcpy(ptr, &finalMsgSize, sizeof(int));
 
-    for (int i = 0 ; i < 2 ; i++) {
-        pipe(pipes[i].pipeChildI);
-        pipe(pipes[i].pipeChildO);
-    }
-    
-    pid_t p[2];
-    int originalSizeQueue = sizeQueue();
-    for (int i = 0 ; i < 2 ; i++) {
 
-        p[i] = fork();
-        if (p[i] < 0) {
-            fprintf(stderr, "fork Failed" );
-            return 1;
-        } else if (p[i] > 0) {  // Parent process
-            close(pipes[i].pipeChildI[0]);  // Close reading end of first pipe
+  //shm for the message
+  const int sharedMemorySize2 = finalMsgSize;
+  const char* name2 = "MySharedMemory2";
+  int shm_fd2;
+  char *ptr2;
+  shm_fd2 = shm_open(name2, O_CREAT | O_RDWR, 0666);
+  ftruncate(shm_fd2, sharedMemorySize2);
 
-            // Write input string and close writing end of first
-            // pipe.  
-            while( sizeQueue()-1 != 0){
-                if (i == 0 && sizeQueue() == originalSizeQueue/2)
-                    break;
-                char *str1 = dequeue();
-                char *strlength = parseInt(strlen(str1));
-                    
-                struct msg *msgToSend = malloc(sizeof(msg));
-                msgToSend->bytesToRead = strlen(str1);
-                msgToSend->data = str1;
+  ptr2 = (char*)mmap(NULL, sharedMemorySize2, PROT_WRITE, MAP_SHARED, shm_fd2, 0);
+  // memcpy(ptr2, finalMsg, finalMsgSize);
 
-                write(pipes[i].pipeChildI[1], msgToSend, sizeof(msg));
-                
-                free(msgToSend->data);
-                free(msgToSend);
-            }
 
+  printf("size queue %i\n", sizeQueue());
+  printf("is empty %i\n", isEmpty());
+
+  //Creates pipes to communicate with children (pipeChildI receives messages from child and pipeChildO sends messages to child)
+  for (int i = 0 ; i < MAX_SLAVES ; i++) {
+    pipe(pipes[i].pipeChildI);
+    pipe(pipes[i].pipeChildO);
+  }
+
+  pid_t p[MAX_SLAVES];
+
+  for (int i = 0 ; i < MAX_SLAVES && sizeQueue()-1!=0 ; i++) {
+
+    p[i] = fork();
+    if (p[i] < 0) {
+      fprintf(stderr, "Fork Failed" );
+      return 1;
+    } else if (p[i] == 0) {  // Child Process
+
+      close(pipes[i].pipeChildI[0]);
+      close(pipes[i].pipeChildO[1]);
+
+      while(1){
+
+        char * msg = readPipe(pipes[i].pipeChildO);
+        if(msg != NULL){
+          if(*msg == 0){
+            printf("Child %d exit\n", i);
             close(pipes[i].pipeChildI[1]);
-    
-            close(pipes[i].pipeChildO[1]); // Close writing end of second pipe
-            // Read string from child, print it and close
-            // reading end.
-            char buf;
-            printf("\nLectura desde padre:\n");
-            while (read(pipes[i].pipeChildO[0], &buf, 1)> 0){
-                write(STDOUT_FILENO, &buf, 1); 
-                //
-                sprintf(ptr2, &buf);
-                ptr2 += 1;
-
-                
-            }   
             close(pipes[i].pipeChildO[0]);
-        } else { // child process
-                printf("Proceso hijo\n");
-                close(pipes[i].pipeChildI[1]);  // Close writing end of first pipe
+            exit(0);
+          }else{
+            receiveTask(msg, i);
+          }
+          free(msg);
+        }
+      }
 
-                // Read a string using first pipe
-                char md5[MD5_LEN + 1];
-                struct msg * msgToRead = malloc(sizeof(msg));
-                while (read(pipes[i].pipeChildI[0], msgToRead,sizeof(msg))> 0){
+    }else{ // Parent Process
+      close(pipes[i].pipeChildI[1]);
+      close(pipes[i].pipeChildO[0]);
 
-                    int len = msgToRead->bytesToRead;
-
-                    if (!CalcFileMD5(msgToRead->data, md5)) {
-                        puts("Error occured!");
-                    } else {
-                        // printf("Success! MD5 sum is: %s\n", md5);
-                        write(pipes[i].pipeChildO[1], msgToRead->data, msgToRead->bytesToRead+1);
-                        write(pipes[i].pipeChildO[1], " md5: ", 7);
-                        write(pipes[i].pipeChildO[1], md5, strlen(md5));
-                        write(pipes[i].pipeChildO[1], "\n", 1);
-                        close(pipes[i].pipeChildO[0]);
-                    }
-                    free(msgToRead->data);
-                    free(msgToRead);
-                    msgToRead = malloc(sizeof(msg));
-                }
-                
-                // Close reading end
-                close(pipes[i].pipeChildI[0]);
-                
-                // Write concatenated string and close writing end
-                close(pipes[i].pipeChildO[1]);
-                exit(0);
-            }	
+      delegateTask(i);
     }
-    int storage;
-    for(int i = 0; i < 2; i++)
-    {
-        if (p[i] != 0)
-            waitpid(p[i], &storage, WUNTRACED);
+  }
+
+  while(sizeQueue()-1 != 0){
+    for(int i=0; i < MAX_SLAVES && sizeQueue()-1 != 0 ; i++){
+      char * msg = readPipe(pipes[i].pipeChildI);
+      if(msg != NULL){
+        //printf("(%d) %s\n",i, msg);
+        sprintf(ptr2, msg, strlen(msg)+1);
+        ptr2+=strlen(msg)+1;
+        delegateTask(i);
+        free(msg);
+      }
     }
+  }
 
+  //Tells childs to exit and closes pipes
+  char str1[1];
+  str1[0] = 0;
+  for(int i=0; i<MAX_SLAVES;i++){
+    write(pipes[i].pipeChildO[1], str1, 1);
 
-   
-
-    sem_post(semView);
-
-
-
-
-    printf("so far so good, my pid is: %i\n", getpid());
-    sleep(20);
-    printf("bye!\n");
-
-
-    shm_unlink("MySharedMemory");
-    shm_unlink("MySharedMemory2");
-    sem_close(semView);
-    sem_unlink(semViewName);
+    close(pipes[i].pipeChildI[0]);
+    close(pipes[i].pipeChildO[1]);
+  }
 
 
 
- }
+
+  sem_post(semView);
+
+
+
+
+  printf("so far so good, my pid is: %i\n", getpid());
+  sleep(20);
+  printf("bye!\n");
+
+
+  shm_unlink("MySharedMemory");
+  shm_unlink("MySharedMemory2");
+  sem_close(semView);
+  sem_unlink(semViewName);
+
+
+
+}
