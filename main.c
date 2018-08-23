@@ -21,6 +21,7 @@ typedef struct pipes {
 } pipeType;
 
 char * parseInt(int num) {
+    int i;
     int numArray[4];
     char *toRet = malloc(sizeof(char) *5);
 
@@ -35,17 +36,18 @@ char * parseInt(int num) {
         current-= 1;
     }
 
-    for (int i = 0 ; i < 4 ; i++)
+    for ( i = 0 ; i < 4 ; i++)
         toRet[i] = (numArray[i] + '0');
     toRet[4] = '\0';
     return toRet;
 }
 
 int parseChar(char * str) {
+    int i;
     int num = 0;
     int exp = 1000;
     printf("supuesto bytes to read %s \n",str);
-    for (int i = 0 ; i < 4 ; i++) {
+    for ( i = 0 ; i < 4 ; i++) {
         num += (str[i] - '0') * exp;
         exp /= 10;
     }
@@ -55,7 +57,7 @@ int parseChar(char * str) {
 int main(int argc, char *argv[]){
 
 
-    
+    int i;
    
 
     //semaphore
@@ -106,7 +108,7 @@ int main(int argc, char *argv[]){
 
     pipeType pipes[2];
 
-    for (int i = 0 ; i < 2 ; i++) {
+    for ( i = 0 ; i < 2 ; i++) {
         pipe(pipes[i].pipeChildI);
         pipe(pipes[i].pipeChildO);
     }
@@ -116,7 +118,7 @@ int main(int argc, char *argv[]){
 
     FILE *file =fopen("md5files.txt", "a");
 
-    for (int i = 0 ; i < 2 ; i++) {
+    for ( i = 0 ; i < 2 ; i++) {
 
         p[i] = fork();
         if (p[i] < 0) {
@@ -195,7 +197,7 @@ int main(int argc, char *argv[]){
             }	
     }
     int storage;
-    for(int i = 0; i < 2; i++)
+    for( i = 0; i < 2; i++)
     {
         if (p[i] != 0)
             waitpid(p[i], &storage, WUNTRACED);
