@@ -152,9 +152,9 @@ int main(int argc, char *argv[]){
             // reading end.
             char buf;
             
-            printf("\nLectura desde padre:\n");
+            //printf("\nLectura desde padre:\n");
             while (read(pipes[i].pipeChildO[0], &buf, 1)> 0){
-                write(STDOUT_FILENO, &buf, 1); 
+                //write(STDOUT_FILENO, &buf, 1); 
                 //
                 fprintf(file, "%c", buf);
                 sprintf(ptr2, &buf);
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]){
                 
             close(pipes[i].pipeChildO[0]);
         } else { // child process
-                printf("Proceso hijo\n");
+                //printf("Proceso hijo\n");
                 close(pipes[i].pipeChildI[1]);  // Close writing end of first pipe
 
                 // Read a string using first pipe
