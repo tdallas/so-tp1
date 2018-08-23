@@ -6,6 +6,9 @@
 #include<sys/types.h>
 #include<string.h>
 #include<sys/wait.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 
 struct msg {
     int bytesToRead;
@@ -51,12 +54,59 @@ int parseChar(char * str) {
 
 int main(int argc, char *argv[]){
 
-	if ( argc <2){
-		printf("Usage: %s <directory>\n", argv[0]);
-		return 0;
-	} 
+
+    
+   
+
+    //semaphore
+    char semViewName[64];
+    sem_t *semView;
+    sprintf(semViewName, "/semView%d", getpid());
+    semView = sem_open(semViewName, O_CREAT | O_EXCL, 0777, 0);
+
+    if(semView == SEM_FAILED){
+        perror("ERROR OPEN SEMAPHORE");
+        return 1;
+    } 
+    
 
 	createPathQueue(argv[1]);
+
+    int finalMsgSize = pathsSize() + ((sizeQueue()-1) * 41);
+
+
+    //
+    //
+
+    
+
+    //shm for size
+    const int sharedMemorySize = sizeof(int*); 
+    const char* name = "MySharedMemory";  
+    int shm_fd; //shm file descriptor
+    int *ptr;
+    shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
+    ftruncate(shm_fd, sharedMemorySize);
+    ptr = (int*)mmap(NULL, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+
+   
+    memcpy(ptr, &finalMsgSize, sizeof(int));
+
+
+    //shm for the message
+    const int sharedMemorySize2 = finalMsgSize; 
+    const char* name2 = "MySharedMemory2";
+    int shm_fd2;
+    char *ptr2;
+    shm_fd2 = shm_open(name2, O_CREAT | O_RDWR, 0666);
+    ftruncate(shm_fd2, sharedMemorySize2);
+    
+    ptr2 = (char*)mmap(NULL, sharedMemorySize2, PROT_WRITE, MAP_SHARED, shm_fd2, 0);
+   // memcpy(ptr2, finalMsg, finalMsgSize);
+
+
+
+    //
 
 	printf("size queue %i\n", sizeQueue());
 	printf("is empty %i\n", isEmpty());
@@ -70,6 +120,9 @@ int main(int argc, char *argv[]){
     
     pid_t p[2];
     int originalSizeQueue = sizeQueue();
+
+    FILE *file =fopen("md5files.txt", "a");
+
     for (int i = 0 ; i < 2 ; i++) {
 
         p[i] = fork();
@@ -103,10 +156,16 @@ int main(int argc, char *argv[]){
             // Read string from child, print it and close
             // reading end.
             char buf;
+            
             printf("\nLectura desde padre:\n");
             while (read(pipes[i].pipeChildO[0], &buf, 1)> 0){
                 write(STDOUT_FILENO, &buf, 1); 
-            }   
+                //
+                fprintf(file, "%c", buf);
+                sprintf(ptr2, &buf);
+                ptr2 += 1;         
+            } 
+                
             close(pipes[i].pipeChildO[0]);
         } else { // child process
                 printf("Proceso hijo\n");
@@ -148,4 +207,25 @@ int main(int argc, char *argv[]){
         if (p[i] != 0)
             waitpid(p[i], &storage, WUNTRACED);
     }
+
+
+ 
+    fclose(file); 
+    sem_post(semView);
+
+
+
+
+    printf("so far so good, my pid is: %i\n", getpid());
+    sleep(20);
+    printf("bye!\n");
+
+
+    shm_unlink("MySharedMemory");
+    shm_unlink("MySharedMemory2");
+    sem_close(semView);
+    sem_unlink(semViewName);
+
+
+
  }
