@@ -73,11 +73,6 @@ int main(int argc, char *argv[]){
 	createPathQueue(argv[1]);
 
     int finalMsgSize = pathsSize() + ((sizeQueue()-1) * 41);
-
-
-    //
-    //
-
     
 
     //shm for size
@@ -102,11 +97,9 @@ int main(int argc, char *argv[]){
     ftruncate(shm_fd2, sharedMemorySize2);
     
     ptr2 = (char*)mmap(NULL, sharedMemorySize2, PROT_WRITE, MAP_SHARED, shm_fd2, 0);
-   // memcpy(ptr2, finalMsg, finalMsgSize);
 
 
-
-    //
+    
 
 	printf("size queue %i\n", sizeQueue());
 	printf("is empty %i\n", isEmpty());
