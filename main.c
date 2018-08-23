@@ -103,8 +103,8 @@ int main(int argc, char *argv[]){
 
     
 
-	printf("size queue %i\n", sizeQueue());
-	printf("is empty %i\n", isEmpty());
+	//printf("size queue %i\n", sizeQueue());
+	//printf("is empty %i\n", isEmpty());
 
     pipeType pipes[2];
 
